@@ -1,0 +1,52 @@
+# AS923 Region Configuration (Southeast Asia)
+# Covers: Thailand, Vietnam, Malaysia, Singapore, etc.
+#
+# The SE02-LB should be configured to use AS923 frequency plan.
+
+[[regions]]
+
+  [regions.network]
+    name = "as923"
+    common_name = "AS923"
+
+  [regions.gateway]
+    force_gws_private = false
+
+    [regions.gateway.channels]
+      # AS923 default channels
+      [[regions.gateway.channels.lora_std]]
+        frequency = 923200000
+        bandwidth = 125000
+        spreading_factor = 7
+
+  [regions.network.extra_channels]
+    # Additional AS923 channels for higher throughput
+    [[regions.network.extra_channels.lora_std]]
+      frequency = 923400000
+      bandwidth = 125000
+      min_dr = 0
+      max_dr = 5
+
+    [[regions.network.extra_channels.lora_std]]
+      frequency = 923600000
+      bandwidth = 125000
+      min_dr = 0
+      max_dr = 5
+
+    [[regions.network.extra_channels.lora_std]]
+      frequency = 923800000
+      bandwidth = 125000
+      min_dr = 0
+      max_dr = 5
+
+    [[regions.network.extra_channels.lora_std]]
+      frequency = 924000000
+      bandwidth = 125000
+      min_dr = 0
+      max_dr = 5
+
+    [[regions.network.extra_channels.lora_std]]
+      frequency = 924200000
+      bandwidth = 125000
+      min_dr = 0
+      max_dr = 5

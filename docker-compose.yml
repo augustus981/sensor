@@ -1,0 +1,114 @@
+###############################################################################
+# Durian Garden IoT — Data Collection Stack
+#
+# Services:
+#   - chirpstack     : LoRaWAN Network Server (receives data from gateways)
+#   - chirpstack-gw  : ChirpStack Gateway Bridge (connects LoRa gateway hardware)
+#   - postgres       : Database for ChirpStack + sensor data storage
+#   - redis          : Cache/queue for ChirpStack
+#   - mosquitto      : MQTT broker (ChirpStack → data_collector)
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f chirpstack
+###############################################################################
+
+version: "3.8"
+
+services:
+  # ──────────────────────────────────────────────────────────────────────────
+  # PostgreSQL — stores ChirpStack device registry + our sensor data
+  # ──────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: durian_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: durian
+      POSTGRES_PASSWORD: durian_iot_2026
+      POSTGRES_DB: durian_iot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/init-db.sql:/docker-entrypoint-initdb.d/001-init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U durian -d durian_iot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Redis — required by ChirpStack for deduplication & caching
+  # ──────────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: durian_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Mosquitto MQTT Broker — message bus between ChirpStack and data_collector
+  # ──────────────────────────────────────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: durian_mosquitto
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    ports:
+      - "1883:1883"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # ChirpStack — LoRaWAN Network Server
+  # Manages device registration, decodes LoRaWAN frames, publishes to MQTT
+  # ──────────────────────────────────────────────────────────────────────────
+  chirpstack:
+    image: chirpstack/chirpstack:4
+    container_name: durian_chirpstack
+    restart: unless-stopped
+    command: -c /etc/chirpstack
+    volumes:
+      - ./infrastructure/chirpstack:/etc/chirpstack
+    ports:
+      - "8080:8080"   # Web UI + REST API
+      - "8000:8000"   # gRPC API (for gateway bridge)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      POSTGRESQL_HOST: postgres
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # ChirpStack Gateway Bridge — connects physical LoRa gateways to ChirpStack
+  # Your Dragino LPS8N gateway will point to this service
+  # ──────────────────────────────────────────────────────────────────────────
+  chirpstack-gateway-bridge:
+    image: chirpstack/chirpstack-gateway-bridge:4
+    container_name: durian_gw_bridge
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
+    ports:
+      - "1700:1700/udp"   # Semtech UDP Packet Forwarder port
+    depends_on:
+      - mosquitto
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_log:

@@ -1,0 +1,36 @@
+# ChirpStack Configuration
+# Durian Garden IoT — LoRaWAN Network Server
+#
+# Documentation: https://www.chirpstack.io/docs/chirpstack/configuration.html
+
+[logging]
+  level = "info"
+
+[postgresql]
+  dsn = "postgres://durian:durian_iot_2026@postgres/durian_iot?sslmode=disable"
+  max_open_connections = 10
+
+[redis]
+  servers = ["redis://redis/"]
+
+[network]
+  net_id = "000000"
+  enabled_regions = [
+    "as923",       # Southeast Asia (Thailand, Vietnam, Malaysia)
+    "as923_2",     # AS923 group 2
+    "as923_3",     # AS923 group 3
+  ]
+
+[monitoring]
+  bind = "0.0.0.0:8070"
+
+[api]
+  bind = "0.0.0.0:8080"
+  secret = "durian-iot-api-secret-change-in-production"
+
+[integration]
+  enabled = ["mqtt"]
+
+  [integration.mqtt]
+    server = "tcp://mosquitto:1883/"
+    json = true
